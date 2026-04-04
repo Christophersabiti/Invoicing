@@ -3,8 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// ─── Default company settings (overridden by company_settings table once built) ─
-const COMPANY = {
+// ─── Hardcoded fallbacks (used if DB tables not yet created) ─────────────────
+const COMPANY_DEFAULTS = {
   name: 'Sabtech Online',
   email: 'info@sabtechonline.com',
   phone: '+256 777 293 933',
@@ -12,26 +12,32 @@ const COMPANY = {
   website: 'www.sabtechonline.com',
   tin: '1009345230',
   footer_note: 'Thank you for your business. Payment is due within the specified due date. Late payments may attract additional charges.',
+  primary_color: '#0f172a',
+  accent_color: '#7c2cbf',
+  logo_url: null as string | null,
+  show_tin_on_invoice: true,
+  show_logo_on_invoice: true,
+  show_payment_history: true,
+  default_invoice_footer: 'Thank you for your business.',
 };
 
-// ─── Default payment methods (overridden by payment_methods table once built) ──
-const PAYMENT_METHODS_DATA = [
+const PAYMENT_METHODS_FALLBACK = [
   {
-    label: 'MTN Mobile Money',
+    display_name: 'MTN Mobile Money',
     details: [
       { key: 'Number', value: '0777 293 933' },
       { key: 'Account Name', value: 'Christopher Sabiti' },
     ],
   },
   {
-    label: 'MOMO Merchant',
+    display_name: 'MOMO Merchant',
     details: [
       { key: 'Merchant Code', value: '876997' },
       { key: 'Account Name', value: 'Christopher Sabiti' },
     ],
   },
   {
-    label: 'Bank Transfer — Centenary Bank',
+    display_name: 'Bank Transfer — Centenary Bank',
     details: [
       { key: 'Account Name', value: 'Christopher Sabiti' },
       { key: 'Account Number', value: '3200051550' },
@@ -40,6 +46,31 @@ const PAYMENT_METHODS_DATA = [
     ],
   },
 ];
+
+type DBPaymentMethod = {
+  display_name: string;
+  account_name: string | null;
+  account_number: string | null;
+  phone_number: string | null;
+  merchant_code: string | null;
+  bank_name: string | null;
+  branch: string | null;
+  swift_code: string | null;
+  instructions: string | null;
+  method_type: string;
+};
+
+function buildPaymentDetails(m: DBPaymentMethod): { key: string; value: string }[] {
+  const details: { key: string; value: string }[] = [];
+  if (m.account_name)   details.push({ key: 'Account Name', value: m.account_name });
+  if (m.phone_number)   details.push({ key: 'Phone', value: m.phone_number });
+  if (m.merchant_code)  details.push({ key: 'Merchant Code', value: m.merchant_code });
+  if (m.account_number) details.push({ key: 'Account No.', value: m.account_number });
+  if (m.bank_name)      details.push({ key: 'Bank', value: m.bank_name + (m.branch ? ` · ${m.branch}` : '') });
+  if (m.swift_code)     details.push({ key: 'SWIFT', value: m.swift_code });
+  if (m.instructions)   details.push({ key: 'Note', value: m.instructions });
+  return details;
+}
 
 function getSupabase() {
   return createClient(
@@ -88,7 +119,11 @@ export async function GET(
   const isPrint = req.nextUrl.searchParams.get('print') === '1';
   const supabase = getSupabase();
 
-  const [{ data: invoice }, { data: items }, { data: payments }] = await Promise.all([
+  // ── Load company settings + payment methods from DB (with fallback) ────────
+  const [
+    { data: invoice }, { data: items }, { data: payments },
+    { data: companySettingsRow }, { data: dbPaymentMethods },
+  ] = await Promise.all([
     supabase
       .from('invoices')
       .select('*, client:clients(*), project:projects(project_name, project_code)')
@@ -104,11 +139,43 @@ export async function GET(
       .select('*')
       .eq('invoice_id', id)
       .order('payment_date'),
+    supabase.from('company_settings').select('*').eq('id', 1).single(),
+    supabase.from('payment_methods')
+      .select('*')
+      .eq('is_active', true)
+      .eq('show_on_invoice', true)
+      .order('display_order'),
   ]);
 
   if (!invoice) {
     return new NextResponse('Invoice not found', { status: 404 });
   }
+
+  // ── Merge DB settings with fallbacks ───────────────────────────────────────
+  const co = {
+    name:          companySettingsRow?.company_name   ?? COMPANY_DEFAULTS.name,
+    email:         companySettingsRow?.email           ?? COMPANY_DEFAULTS.email,
+    phone:         companySettingsRow?.phone           ?? COMPANY_DEFAULTS.phone,
+    address:       companySettingsRow?.address         ?? COMPANY_DEFAULTS.address,
+    website:       companySettingsRow?.website         ?? COMPANY_DEFAULTS.website,
+    tin:           companySettingsRow?.tin             ?? COMPANY_DEFAULTS.tin,
+    footer_note:   companySettingsRow?.default_invoice_footer ?? COMPANY_DEFAULTS.footer_note,
+    primary_color: companySettingsRow?.primary_color  ?? COMPANY_DEFAULTS.primary_color,
+    accent_color:  companySettingsRow?.accent_color   ?? COMPANY_DEFAULTS.accent_color,
+    logo_url:      companySettingsRow?.logo_url        ?? COMPANY_DEFAULTS.logo_url,
+    show_tin:      companySettingsRow?.show_tin_on_invoice  ?? COMPANY_DEFAULTS.show_tin_on_invoice,
+    show_logo:     companySettingsRow?.show_logo_on_invoice ?? COMPANY_DEFAULTS.show_logo_on_invoice,
+    show_payments: companySettingsRow?.show_payment_history ?? COMPANY_DEFAULTS.show_payment_history,
+  };
+
+  // ── Build payment method cards from DB or fallback ─────────────────────────
+  type PMCard = { display_name: string; details: { key: string; value: string }[] };
+  const paymentMethodCards: PMCard[] = dbPaymentMethods && dbPaymentMethods.length > 0
+    ? dbPaymentMethods.map((m: DBPaymentMethod) => ({
+        display_name: m.display_name,
+        details: buildPaymentDetails(m),
+      }))
+    : PAYMENT_METHODS_FALLBACK;
 
   const client = invoice.client as {
     name: string; company_name?: string; email?: string;
@@ -179,11 +246,11 @@ export async function GET(
       </table>
     </div>` : '';
 
-  // ── Payment methods block ──────────────────────────────────────────────────
-  const paymentMethodCardsHtml = PAYMENT_METHODS_DATA.map(m => `
+  // ── Payment methods block (from DB or fallback) ───────────────────────────
+  const paymentMethodCardsHtml = paymentMethodCards.map((m: PMCard) => `
     <div style="flex:1;min-width:160px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">
-      <div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e2e8f0">${m.label}</div>
-      ${m.details.map(d => `
+      <div style="font-size:11px;font-weight:700;color:${co.primary_color};margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e2e8f0">${m.display_name}</div>
+      ${m.details.map((d: { key: string; value: string }) => `
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:3px">
           <span style="color:#64748b">${d.key}:</span>
           <span style="font-weight:700;color:#0f172a;font-family:monospace">${d.value}</span>
@@ -195,7 +262,7 @@ export async function GET(
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>${invoice.invoice_number} — ${COMPANY.name}</title>
+  <title>${invoice.invoice_number} — ${co.name}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{
@@ -218,7 +285,7 @@ export async function GET(
       ← Back
     </a>
     <button onclick="window.print()"
-      style="display:inline-flex;align-items:center;gap:6px;background:#0f172a;color:#fff;border:none;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
+      style="display:inline-flex;align-items:center;gap:6px;background:${co.primary_color};color:#fff;border:none;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
       ⬇ Download PDF
     </button>
   </div>
@@ -226,19 +293,19 @@ export async function GET(
   <!-- ══ INVOICE DOCUMENT ═════════════════════════════════════════════════════ -->
 
   <!-- Header -->
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px;padding-bottom:24px;border-bottom:3px solid #0f172a">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px;padding-bottom:24px;border-bottom:3px solid ${co.primary_color}">
     <div style="display:flex;align-items:center;gap:16px">
-      ${LOGO_SVG}
+      ${co.show_logo && co.logo_url ? `<img src="${co.logo_url}" alt="Logo" style="width:60px;height:60px;object-fit:contain;flex-shrink:0"/>` : LOGO_SVG}
       <div>
-        <div style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.5px">${COMPANY.name}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:2px">${COMPANY.email} · ${COMPANY.phone}</div>
-        <div style="font-size:11px;color:#64748b">${COMPANY.address} · ${COMPANY.website}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px">TIN: <strong style="color:#0f172a;font-family:monospace">${COMPANY.tin}</strong></div>
+        <div style="font-size:22px;font-weight:800;color:${co.primary_color};letter-spacing:-0.5px">${co.name}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px">${co.email} · ${co.phone}</div>
+        <div style="font-size:11px;color:#64748b">${co.address} · ${co.website}</div>
+        ${co.show_tin && co.tin ? `<div style="font-size:11px;color:#64748b;margin-top:4px">TIN: <strong style="color:${co.primary_color};font-family:monospace">${co.tin}</strong></div>` : ''}
       </div>
     </div>
     <div style="text-align:right">
-      <div style="font-size:28px;font-weight:900;color:#0f172a;letter-spacing:-1px">INVOICE</div>
-      <div style="font-size:17px;font-weight:700;font-family:monospace;color:#0f172a;margin-top:4px">${invoice.invoice_number}</div>
+      <div style="font-size:28px;font-weight:900;color:${co.primary_color};letter-spacing:-1px">INVOICE</div>
+      <div style="font-size:17px;font-weight:700;font-family:monospace;color:${co.primary_color};margin-top:4px">${invoice.invoice_number}</div>
       <div>
         <span style="display:inline-block;margin-top:8px;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.06em;color:#fff;background:${statusColor}">
           ${statusLabel}
@@ -327,16 +394,16 @@ export async function GET(
   ${paymentsHtml}
 
   <!-- Payment Instructions -->
-  <div style="margin-bottom:32px;padding:20px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;border-left:4px solid #7c2cbf">
-    <h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#7c2cbf;margin-bottom:16px">
+  <div style="margin-bottom:32px;padding:20px;background:${co.accent_color}10;border:1px solid ${co.accent_color}40;border-radius:12px;border-left:4px solid ${co.accent_color}">
+    <h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${co.accent_color};margin-bottom:16px">
       💳 Payment Instructions
     </h3>
     <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px">
       ${paymentMethodCardsHtml}
     </div>
-    <div style="font-size:11px;color:#475569;line-height:1.7;padding-top:12px;border-top:1px solid #e9d5ff">
+    <div style="font-size:11px;color:#475569;line-height:1.7;padding-top:12px;border-top:1px solid ${co.accent_color}30">
       Please include <strong style="font-family:monospace">${invoice.invoice_number}</strong> as the payment reference.
-      Send proof of payment to <strong>${COMPANY.email}</strong> or call <strong>${COMPANY.phone}</strong>.
+      Send proof of payment to <strong>${co.email}</strong> or call <strong>${co.phone}</strong>.
     </div>
   </div>
 
@@ -344,10 +411,10 @@ export async function GET(
   <div style="border-top:1px solid #e2e8f0;padding-top:20px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px">
     <div style="max-width:520px">
       <p style="font-size:11px;color:#475569;line-height:1.7;margin-bottom:6px">
-        ${invoice.footer_note || COMPANY.footer_note}
+        ${invoice.footer_note || co.footer_note}
       </p>
       <p style="font-size:10px;color:#94a3b8">
-        TIN: ${COMPANY.tin} · ${COMPANY.name} · ${COMPANY.website}
+        ${co.show_tin && co.tin ? `TIN: ${co.tin} · ` : ''}${co.name} · ${co.website}
       </p>
     </div>
     <div style="text-align:right;flex-shrink:0">

@@ -136,3 +136,105 @@ export type ReportSummary = {
   count_overdue: number;
   count_cancelled: number;
 };
+
+// ─── Phase 2B: Admin Settings ─────────────────────────────────────────────
+
+export type CompanySettings = {
+  id: 1;
+  company_name: string;
+  trading_name: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  address: string | null;
+  country: string;
+  currency: string;
+  tin: string | null;
+  registration_number: string | null;
+  logo_url: string | null;
+  default_invoice_footer: string | null;
+  invoice_prefix: string;
+  receipt_prefix: string;
+  quote_prefix: string;
+  default_due_days: number;
+  show_tin_on_invoice: boolean;
+  show_logo_on_invoice: boolean;
+  show_payment_history: boolean;
+  primary_color: string;
+  accent_color: string;
+  updated_at: string;
+};
+
+export type PaymentMethodType =
+  | 'mobile_money'
+  | 'momo_merchant'
+  | 'bank_transfer'
+  | 'wire_transfer'
+  | 'cash'
+  | 'card'
+  | 'cheque'
+  | 'other';
+
+export type PaymentMethodDB = {
+  id: string;
+  method_type: PaymentMethodType;
+  display_name: string;
+  account_name: string | null;
+  account_number: string | null;
+  phone_number: string | null;
+  merchant_code: string | null;
+  bank_name: string | null;
+  branch: string | null;
+  swift_code: string | null;
+  currency: string;
+  instructions: string | null;
+  is_active: boolean;
+  show_on_invoice: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Role = {
+  id: string;
+  label: string;
+  description: string | null;
+  is_system: boolean;
+  created_at: string;
+};
+
+export type Permission = {
+  id: string;
+  module: string;
+  action: string;
+  label: string;
+  description: string | null;
+};
+
+export type AppUser = {
+  id: string;
+  auth_user_id: string | null;
+  email: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: string;
+  status: 'invited' | 'active' | 'inactive' | 'suspended';
+  invited_by: string | null;
+  invited_at: string | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Invitation = {
+  id: string;
+  email: string;
+  role: string;
+  token: string;
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled';
+  invited_by: string | null;
+  permission_overrides: Record<string, boolean> | null;
+  expires_at: string;
+  accepted_at: string | null;
+  created_at: string;
+};
