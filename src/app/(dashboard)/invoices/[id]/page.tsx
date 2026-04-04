@@ -8,7 +8,7 @@ import { Invoice, InvoiceItem, Payment } from '@/types';
 import { formatCurrency, formatDate, PAYMENT_METHOD_LABELS } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ArrowLeft, Download, Plus, X, CreditCard, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Download, Printer, Plus, X, CreditCard, CheckCircle, Smartphone, Building2 } from 'lucide-react';
 
 const PAYMENT_METHODS = ['bank_transfer', 'mobile_money', 'cash', 'cheque', 'online', 'other'] as const;
 
@@ -81,8 +81,12 @@ export default function InvoiceDetailPage() {
     load();
   }
 
-  async function downloadPDF() {
-    // Navigate to PDF generation route
+  function downloadPDF() {
+    // Opens branded HTML invoice in new tab with auto-print → user saves as PDF
+    window.open(`/api/pdf/invoice/${id}?print=1`, '_blank');
+  }
+
+  function printInvoice() {
     window.open(`/api/pdf/invoice/${id}`, '_blank');
   }
 
@@ -127,10 +131,16 @@ export default function InvoiceDetailPage() {
               </button>
             )}
             <button
-              onClick={downloadPDF}
+              onClick={printInvoice}
               className="inline-flex items-center gap-2 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-4 py-2 rounded-lg"
             >
-              <Download className="h-4 w-4" /> PDF
+              <Printer className="h-4 w-4" /> Preview
+            </button>
+            <button
+              onClick={downloadPDF}
+              className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm px-4 py-2 rounded-lg font-semibold"
+            >
+              <Download className="h-4 w-4" /> Download PDF
             </button>
             {invoice.status !== 'cancelled' && invoice.status !== 'paid' && (
               <button
@@ -270,12 +280,101 @@ export default function InvoiceDetailPage() {
               </div>
             </div>
 
-            {invoice.footer_note && (
-              <div className="mt-6 pt-6 border-t border-slate-200">
-                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-2">Payment Instructions</p>
-                <p className="text-xs text-slate-600 leading-relaxed">{invoice.footer_note}</p>
+            {/* Download actions */}
+            <div className="mt-6 pt-6 border-t border-slate-200 space-y-2">
+              <button
+                onClick={downloadPDF}
+                className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm px-4 py-2.5 rounded-lg font-semibold"
+              >
+                <Download className="h-4 w-4" /> Download PDF
+              </button>
+              <button
+                onClick={printInvoice}
+                className="w-full inline-flex items-center justify-center gap-2 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm px-4 py-2.5 rounded-lg"
+              >
+                <Printer className="h-4 w-4" /> Preview / Print
+              </button>
+            </div>
+          </div>
+
+          {/* Payment Instructions Card */}
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-5">
+            <h3 className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-4">Payment Instructions</h3>
+
+            {/* MTN Mobile Money */}
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Smartphone className="h-3 w-3 text-yellow-900" />
+                </div>
+                <span className="text-xs font-bold text-slate-800">MTN Mobile Money</span>
               </div>
-            )}
+              <div className="pl-8 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Number:</span>
+                  <span className="font-mono font-bold text-slate-800">0777 293 933</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Account Name:</span>
+                  <span className="font-semibold text-slate-700">Christopher Sabiti</span>
+                </div>
+              </div>
+            </div>
+
+            {/* MOMO Merchant */}
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-yellow-900 text-xs font-black">M</span>
+                </div>
+                <span className="text-xs font-bold text-slate-800">MOMO Merchant</span>
+              </div>
+              <div className="pl-8 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Merchant Code:</span>
+                  <span className="font-mono font-bold text-slate-800">876997</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Account Name:</span>
+                  <span className="font-semibold text-slate-700">Christopher Sabiti</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bank Transfer */}
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Building2 className="h-3 w-3 text-white" />
+                </div>
+                <span className="text-xs font-bold text-slate-800">Bank Transfer</span>
+              </div>
+              <div className="pl-8 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Bank:</span>
+                  <span className="font-semibold text-slate-700">Centenary Bank</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Account Name:</span>
+                  <span className="font-semibold text-slate-700">Christopher Sabiti</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Account #:</span>
+                  <span className="font-mono font-bold text-slate-800">3200051550</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Branch:</span>
+                  <span className="font-semibold text-slate-700">Kasese</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-purple-200 pt-3 mt-3">
+              <p className="text-xs text-purple-700 leading-relaxed">
+                Use <span className="font-mono font-bold">{invoice.invoice_number}</span> as payment reference.
+              </p>
+              <p className="text-xs text-slate-500 mt-1">TIN: <span className="font-mono font-bold text-slate-700">1009345230</span></p>
+            </div>
           </div>
         </div>
       </div>
