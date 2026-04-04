@@ -1,13 +1,14 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   LayoutDashboard, Users, FolderOpen, Tag, FileText,
   CreditCard, BarChart2, Settings, UserCog, Building2,
-  Wallet, Receipt, Palette, ChevronDown, ChevronRight,
+  Wallet, Receipt, Palette, ChevronDown, ChevronRight, LogOut,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 const mainNav = [
   { label: 'Dashboard', href: '/',         icon: LayoutDashboard },
@@ -30,12 +31,38 @@ const adminNav = [
   { label: 'Users',       href: '/admin/users', icon: UserCog },
 ];
 
+type UserInfo = { name: string | null; email: string; role: string };
+
 export function Sidebar() {
   const pathname = usePathname();
+  const router   = useRouter();
+  const supabase = createClient();
   const isInSettings = pathname.startsWith('/admin/settings');
-  const isInAdmin    = pathname.startsWith('/admin');
   const [settingsOpen, setSettingsOpen] = useState(isInSettings);
-  const [adminOpen, setAdminOpen]       = useState(isInAdmin);
+  const [currentUser, setCurrentUser]   = useState<UserInfo | null>(null);
+
+  useEffect(() => {
+    async function fetchUser() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('full_name, email, role')
+        .eq('auth_user_id', session.user.id)
+        .single();
+      if (appUser) {
+        setCurrentUser({ name: appUser.full_name, email: appUser.email, role: appUser.role });
+      } else {
+        setCurrentUser({ name: session.user.user_metadata?.full_name ?? null, email: session.user.email ?? '', role: 'staff' });
+      }
+    }
+    fetchUser();
+  }, []);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push('/login');
+  }
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-64 bg-slate-900 text-white flex flex-col z-50">
@@ -130,8 +157,28 @@ export function Sidebar() {
         })}
       </nav>
 
+      {/* User + Logout */}
       <div className="p-4 border-t border-slate-700">
-        <p className="text-xs text-slate-500 text-center">Sabtech Online &copy; 2026</p>
+        {currentUser ? (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+              {(currentUser.name ?? currentUser.email).charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-white truncate">{currentUser.name ?? currentUser.email}</p>
+              <p className="text-xs text-slate-400 truncate capitalize">{currentUser.role.replace('_', ' ')}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Sign out"
+              className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 text-center">Sabtech Online &copy; 2026</p>
+        )}
       </div>
     </aside>
   );
