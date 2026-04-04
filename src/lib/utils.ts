@@ -54,6 +54,7 @@ export const STATUS_COLORS: Record<InvoiceStatus, string> = {
   paid: 'bg-green-100 text-green-700',
   overdue: 'bg-red-100 text-red-700',
   cancelled: 'bg-gray-200 text-gray-500',
+  void: 'bg-slate-100 text-slate-400',
 };
 
 export const STATUS_LABELS: Record<InvoiceStatus, string> = {
@@ -63,6 +64,7 @@ export const STATUS_LABELS: Record<InvoiceStatus, string> = {
   paid: 'Paid',
   overdue: 'Overdue',
   cancelled: 'Cancelled',
+  void: 'Void',
 };
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
