@@ -6,13 +6,35 @@ export type Client = {
   contact_person: string | null;
   email: string | null;
   phone: string | null;
+  alternate_phone: string | null;
   address: string | null;
+  city: string | null;
+  country: string | null;
   tin_number: string | null;
   currency: string;
   notes: string | null;
+  status: 'active' | 'inactive';
   is_archived: boolean;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type ClientAuditLog = {
+  id: string;
+  client_id: string;
+  changed_by: string | null;
+  changed_at: string;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+};
+
+// Extended client with aggregated project/invoice data (from get_clients_filtered RPC)
+export type ClientWithStats = Client & {
+  active_projects: number;
+  total_outstanding: number;
+  has_overdue: boolean;
 };
 
 export type Service = {
@@ -59,7 +81,7 @@ export type InvoiceSchedule = {
   created_at: string;
 };
 
-export type InvoiceStatus = 'draft' | 'sent' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled';
+export type InvoiceStatus = 'draft' | 'sent' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled' | 'void';
 
 export type Invoice = {
   id: string;
@@ -80,6 +102,9 @@ export type Invoice = {
   notes: string | null;
   footer_note: string | null;
   pdf_url: string | null;
+  void_reason: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
   created_at: string;
   updated_at: string;
   // Joined
@@ -87,6 +112,18 @@ export type Invoice = {
   project?: Project;
   invoice_items?: InvoiceItem[];
   payments?: Payment[];
+};
+
+export type InvoiceAuditLog = {
+  id: string;
+  invoice_id: string;
+  action: string;
+  performed_by: string | null;
+  performed_at: string;
+  old_status: string | null;
+  new_status: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
 };
 
 export type InvoiceItem = {
@@ -107,6 +144,7 @@ export type InvoiceItem = {
 };
 
 export type PaymentMethod = 'bank_transfer' | 'mobile_money' | 'cash' | 'cheque' | 'online' | 'other';
+export type PaymentStatus = 'pending' | 'confirmed' | 'failed' | 'reversed';
 
 export type Payment = {
   id: string;
@@ -119,9 +157,33 @@ export type Payment = {
   note: string | null;
   is_confirmed: boolean;
   receipt_url: string | null;
+  status: PaymentStatus;
+  reversal_reason: string | null;
+  reversed_at: string | null;
+  reversed_by: string | null;
   created_at: string;
   // Joined
   invoice?: Invoice;
+};
+
+export type PaymentAuditLog = {
+  id: string;
+  payment_id: string;
+  action: string;
+  performed_by: string | null;
+  performed_at: string;
+  old_status: string | null;
+  new_status: string | null;
+  reason: string | null;
+  amount: number | null;
+  metadata: Record<string, unknown> | null;
+};
+
+// Extended project with calculated invoice totals (from project_totals view)
+export type ProjectWithTotals = Project & {
+  total_invoiced: number;
+  total_paid: number;
+  outstanding: number;
 };
 
 export type ReportSummary = {
