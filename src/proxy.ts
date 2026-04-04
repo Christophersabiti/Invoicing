@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/accept-invite'];
 const ADMIN_PATHS  = ['/admin/users/roles', '/admin/users/invitations', '/admin/users'];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Allow public assets and API routes to pass through
