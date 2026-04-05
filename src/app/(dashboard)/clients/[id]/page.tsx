@@ -96,11 +96,32 @@ export default function ClientProfilePage() {
   const confirmedPayments = payments.filter(p => p.status !== 'reversed');
 
   async function handleArchiveToggle() {
+  if (!client) return;
+
+  try {
     setArchiving(true);
-    await supabase.from('clients').update({ is_archived: !client.is_archived }).eq('id', client.id);
-    setClient(c => c ? { ...c, is_archived: !c.is_archived } : c);
+
+    const nextArchivedState = !client.is_archived;
+
+    const { error } = await supabase
+      .from('clients')
+      .update({ is_archived: nextArchivedState })
+      .eq('id', client.id);
+
+    if (error) {
+      console.error('Failed to toggle archive status:', error);
+      return;
+    }
+
+    setClient(current =>
+      current ? { ...current, is_archived: nextArchivedState } : current
+    );
+  } catch (error) {
+    console.error('Unexpected archive toggle error:', error);
+  } finally {
     setArchiving(false);
   }
+}
 
   const tabLabels: Record<Tab, string> = {
     overview:  'Overview',
