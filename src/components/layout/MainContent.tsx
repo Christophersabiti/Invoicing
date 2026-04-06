@@ -10,7 +10,7 @@ export function MainContent({ children }: { children: ReactNode }) {
     <main
       className={`min-h-screen transition-all duration-200 ease-in-out
                   p-4 md:p-6 xl:p-8
-                  ${collapsed ? 'lg:ml-16' : 'lg:ml-64'}`}
+                  ${collapsed ? 'md:ml-24' : 'md:ml-80'}`}
     >
       {children}
     </main>

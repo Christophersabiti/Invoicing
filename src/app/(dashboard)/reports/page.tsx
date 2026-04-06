@@ -6,7 +6,67 @@ import { Invoice, Payment } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { FileText, CheckCircle, TrendingUp, AlertCircle } from 'lucide-react';
+import { FileText, CheckCircle, TrendingUp, AlertCircle, Download } from 'lucide-react';
+
+function exportInvoicesCSV(invoices: InvoiceRow[]) {
+  const headers = ['Invoice #', 'Client', 'Project', 'Date', 'Total', 'Paid', 'Balance', 'Status', 'Currency'];
+  const rows = invoices.map(inv => [
+    inv.invoice_number,
+    inv.client?.name ?? '',
+    inv.project?.project_name ?? '',
+    inv.issue_date,
+    inv.total_amount,
+    inv.total_paid,
+    inv.balance_due,
+    inv.status,
+    inv.currency,
+  ]);
+  const csv = [headers, ...rows]
+    .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+    download: `invoices-${new Date().toISOString().slice(0, 10)}.csv`,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportPaymentsCSV(payments: (Payment & { invoice: { invoice_number: string } | null })[]) {
+  const headers = ['Receipt #', 'Date', 'Invoice', 'Amount', 'Method', 'Reference', 'Status'];
+  const rows = payments.map(p => [
+    p.payment_number,
+    p.payment_date,
+    p.invoice?.invoice_number ?? '',
+    p.amount_paid,
+    p.payment_method,
+    p.reference_number ?? '',
+    p.status ?? 'confirmed',
+  ]);
+  const csv = [headers, ...rows]
+    .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+    download: `payments-${new Date().toISOString().slice(0, 10)}.csv`,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportClientsCSV(clientRows: { name: string; billed: number; paid: number; outstanding: number }[]) {
+  const headers = ['Client', 'Total Billed', 'Total Collected', 'Outstanding'];
+  const rows = clientRows.map(r => [r.name, r.billed, r.paid, r.outstanding]);
+  const csv = [headers, ...rows]
+    .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+    download: `clients-revenue-${new Date().toISOString().slice(0, 10)}.csv`,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 type InvoiceRow = Invoice & { client: { name: string } | null; project: { project_name: string } | null };
 type Tab = 'overview' | 'invoices' | 'payments' | 'clients';
@@ -191,6 +251,15 @@ export default function ReportsPage() {
         </div>
       ) : tab === 'invoices' ? (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="flex justify-end px-4 py-2 border-b border-slate-100">
+            <button
+              onClick={() => exportInvoicesCSV(invoices)}
+              disabled={invoices.length === 0}
+              className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-40"
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          </div>
           {/* Desktop */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
@@ -238,6 +307,15 @@ export default function ReportsPage() {
         </div>
       ) : tab === 'payments' ? (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="flex justify-end px-4 py-2 border-b border-slate-100">
+            <button
+              onClick={() => exportPaymentsCSV(payments)}
+              disabled={payments.length === 0}
+              className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-40"
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          </div>
           {/* Desktop */}
           <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
@@ -292,6 +370,15 @@ export default function ReportsPage() {
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="flex justify-end px-4 py-2 border-b border-slate-100">
+            <button
+              onClick={() => exportClientsCSV(clientRows)}
+              disabled={clientRows.length === 0}
+              className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 disabled:opacity-40"
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          </div>
           <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
