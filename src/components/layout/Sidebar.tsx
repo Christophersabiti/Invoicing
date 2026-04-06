@@ -346,7 +346,7 @@ export function SidebarNavContent({
               href={href}
               label={label}
               icon={icon as ElementType}
-              active={isActive}
+              isActive={isActive}
               collapsed={collapsed}
               onClick={onNavClick}
             />
@@ -370,7 +370,7 @@ export function SidebarNavContent({
               href={href}
               label={label}
               icon={icon as ElementType}
-              active={isActive}
+              isActive={isActive}
               collapsed={collapsed}
               onClick={onNavClick}
             />
