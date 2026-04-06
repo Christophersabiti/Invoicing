@@ -4,42 +4,60 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard, Users, FolderOpen, Tag, FileText,
-  CreditCard, BarChart2, Settings, UserCog, Building2,
-  Wallet, Receipt, Palette, ChevronLeft, ChevronRight,
-  ChevronDown, LogOut,
+  LayoutDashboard,
+  Users,
+  FolderOpen,
+  Tag,
+  FileText,
+  CreditCard,
+  BarChart2,
+  Settings,
+  UserCog,
+  Building2,
+  Wallet,
+  Receipt,
+  Palette,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  LogOut,
 } from 'lucide-react';
 import { useState, useEffect, ElementType } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useSidebar } from './SidebarContext';
 import { NavItem } from './NavItem';
 
-// ─── Nav definitions ─────────────────────────────────────────────────────────
-
 const mainNav = [
-  { label: 'Dashboard', href: '/',         icon: LayoutDashboard },
-  { label: 'Clients',   href: '/clients',  icon: Users },
-  { label: 'Projects',  href: '/projects', icon: FolderOpen },
-  { label: 'Services',  href: '/services', icon: Tag },
-  { label: 'Invoices',  href: '/invoices', icon: FileText },
-  { label: 'Payments',  href: '/payments', icon: CreditCard },
-  { label: 'Reports',   href: '/reports',  icon: BarChart2 },
+  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { label: 'Clients', href: '/clients', icon: Users },
+  { label: 'Projects', href: '/projects', icon: FolderOpen },
+  { label: 'Services', href: '/services', icon: Tag },
+  { label: 'Invoices', href: '/invoices', icon: FileText },
+  { label: 'Payments', href: '/payments', icon: CreditCard },
+  { label: 'Reports', href: '/reports', icon: BarChart2 },
 ];
 
 const settingsNav = [
-  { label: 'Company Profile',  href: '/admin/settings/company',         icon: Building2 },
-  { label: 'Payment Methods',  href: '/admin/settings/payment-methods', icon: Wallet },
-  { label: 'Invoice Settings', href: '/admin/settings/invoice',         icon: Receipt },
-  { label: 'Branding',         href: '/admin/settings/branding',        icon: Palette },
+  { label: 'Company Profile', href: '/admin/settings/company', icon: Building2 },
+  { label: 'Payment Methods', href: '/admin/settings/payment-methods', icon: Wallet },
+  { label: 'Invoice Settings', href: '/admin/settings/invoice', icon: Receipt },
+  { label: 'Branding', href: '/admin/settings/branding', icon: Palette },
 ];
 
 const adminNav = [
   { label: 'Users', href: '/admin/users', icon: UserCog },
 ];
 
-// ─── User info ───────────────────────────────────────────────────────────────
+type UserInfo = {
+  name: string | null;
+  email: string;
+  role: string;
+};
 
-type UserInfo = { name: string | null; email: string; role: string };
+type CompanyBranding = {
+  company_name: string | null;
+  logo_url: string | null;
+};
 
 function useCurrentUserInfo() {
   const supabase = createClient();
@@ -47,99 +65,186 @@ function useCurrentUserInfo() {
 
   useEffect(() => {
     let active = true;
+
     async function load() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session || !active) return;
+
       const { data } = await supabase
         .from('app_users')
         .select('full_name, email, role')
         .eq('auth_user_id', session.user.id)
         .single();
+
       if (!active) return;
+
       if (data) {
-        setInfo({ name: data.full_name, email: data.email, role: data.role });
+        setInfo({
+          name: data.full_name,
+          email: data.email,
+          role: data.role,
+        });
       } else {
         setInfo({
-          name:  session.user.user_metadata?.full_name ?? null,
+          name: session.user.user_metadata?.full_name ?? null,
           email: session.user.email ?? '',
-          role:  'staff',
+          role: 'staff',
         });
       }
     }
+
     load();
-    return () => { active = false; };
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
 
   return info;
 }
 
-// ─── Settings sub-nav (collapsed: icon-only tooltip group) ───────────────────
+function useCompanyBranding() {
+  const supabase = createClient();
+  const [branding, setBranding] = useState<CompanyBranding>({
+    company_name: 'Sabtech Online',
+    logo_url: null,
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBranding() {
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('company_name, logo_url')
+        .eq('id', 1)
+        .single();
+
+      if (!active) return;
+
+      if (!error && data) {
+        setBranding({
+          company_name: data.company_name || 'Sabtech Online',
+          logo_url: data.logo_url || null,
+        });
+      }
+    }
+
+    loadBranding();
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
+
+  return branding;
+}
+
+function SidebarBrand({
+  collapsed,
+  companyName,
+  logoUrl,
+}: {
+  collapsed: boolean;
+  companyName: string;
+  logoUrl: string | null;
+}) {
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showLogo = !!logoUrl && !logoFailed;
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-800">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-900 ring-1 ring-white/10">
+        {showLogo ? (
+          <Image
+            src={logoUrl as string}
+            alt={`${companyName} logo`}
+            width={56}
+            height={56}
+            className="h-12 w-12 object-contain"
+            unoptimized
+            onError={() => setLogoFailed(true)}
+          />
+        ) : (
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-fuchsia-500 text-fuchsia-500 font-bold text-lg">
+            SAB
+          </div>
+        )}
+      </div>
+
+      {!collapsed && (
+        <div className="min-w-0">
+          <h1 className="truncate text-white text-2xl font-bold leading-tight">
+            {companyName}
+          </h1>
+          <p className="truncate text-slate-400 text-sm">Invoicing System</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SettingsSection({
-  collapsed, pathname,
-}: { collapsed: boolean; pathname: string }) {
+  collapsed,
+  pathname,
+}: {
+  collapsed: boolean;
+  pathname: string;
+}) {
   const isInSettings = pathname.startsWith('/admin/settings');
   const [open, setOpen] = useState(isInSettings);
 
-  // In collapsed mode: just show the Settings icon as a link to the first page
+  useEffect(() => {
+    if (isInSettings) setOpen(true);
+  }, [isInSettings]);
+
   if (collapsed) {
     return (
-      <div className="relative group/navitem">
-        <Link
-          href="/admin/settings/company"
-          className={`flex justify-center py-2.5 text-sm transition-colors
-            ${isInSettings
-              ? 'bg-slate-800 text-white border-l-2 border-purple-500'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-        >
-          <Settings className="h-4 w-4 flex-shrink-0" />
-        </Link>
-        <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-2
-                       -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-700
-                       px-2.5 py-1.5 text-xs font-medium text-white shadow-lg
-                       opacity-0 group-hover/navitem:opacity-100 transition-opacity duration-150">
-          Settings
-          <span className="absolute right-full top-1/2 -translate-y-1/2
-                           border-4 border-transparent border-r-slate-700" />
-        </div>
-      </div>
+      <Link
+        href="/admin/settings/company"
+        className={`flex items-center justify-center px-4 py-3 ${
+          isInSettings ? 'text-white' : 'text-slate-400 hover:text-white'
+        }`}
+        title="Settings"
+      >
+        <Settings className="h-5 w-5" />
+      </Link>
     );
   }
 
-  // Expanded mode: accordion
   return (
     <>
       <button
-        onClick={() => setOpen(o => !o)}
-        className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors
-          ${isInSettings
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors ${
+          isInSettings
             ? 'bg-slate-800 text-white border-l-2 border-purple-500'
             : 'text-slate-400 hover:text-white hover:bg-slate-800'
-          }`}
+        }`}
       >
-        <Settings className="h-4 w-4 flex-shrink-0" />
+        <Settings className="h-5 w-5" />
         <span className="flex-1 text-left">Settings</span>
-        {open
-          ? <ChevronDown className="h-3 w-3 flex-shrink-0" />
-          : <ChevronRight className="h-3 w-3 flex-shrink-0" />
-        }
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
+
       {open && (
-        <div className="ml-5 border-l border-slate-700 pl-3 space-y-0.5">
+        <div className="mt-1 space-y-1">
           {settingsNav.map(({ label, href, icon: Icon }) => {
             const isActive = pathname.startsWith(href);
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-2.5 px-3 py-2 text-xs rounded-r transition-colors
-                  ${isActive
-                    ? 'bg-purple-900/50 text-purple-300'
+                className={`ml-12 flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors ${
+                  isActive
+                    ? 'text-white bg-slate-800'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
+                }`}
               >
-                <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                <Icon className="h-4 w-4" />
                 {label}
               </Link>
             );
@@ -150,72 +255,60 @@ function SettingsSection({
   );
 }
 
-// ─── User footer ─────────────────────────────────────────────────────────────
-
-function UserFooter({ collapsed, user, onLogout }: {
+function UserFooter({
+  collapsed,
+  user,
+  onLogout,
+}: {
   collapsed: boolean;
-  user:      UserInfo | null;
-  onLogout:  () => void;
+  user: UserInfo | null;
+  onLogout: () => void;
 }) {
-  if (!user) return (
-    <div className="p-4 border-t border-slate-700">
-      <div className="h-8 rounded bg-slate-800 animate-pulse" />
-    </div>
-  );
+  if (!user) return <div className="p-4 text-slate-500 text-sm">Loading…</div>;
 
   const initial = (user.name ?? user.email).charAt(0).toUpperCase();
 
   if (collapsed) {
     return (
-      <div className="p-2 border-t border-slate-700 flex flex-col items-center gap-2">
-        <div className="relative group/navitem">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-600
-                         flex items-center justify-center text-white text-xs font-bold cursor-default">
-            {initial}
-          </div>
-          <div className="pointer-events-none absolute left-full bottom-0 z-50 ml-2
-                         whitespace-nowrap rounded-md bg-slate-700 px-2.5 py-1.5
-                         text-xs font-medium text-white shadow-lg
-                         opacity-0 group-hover/navitem:opacity-100 transition-opacity duration-150">
-            {user.name ?? user.email}
-            <span className="block text-slate-400 capitalize">{user.role.replace('_', ' ')}</span>
-            <span className="absolute right-full top-1/2 -translate-y-1/2
-                             border-4 border-transparent border-r-slate-700" />
-          </div>
-        </div>
+      <div className="border-t border-slate-800 p-3">
         <button
           onClick={onLogout}
-          title="Sign out"
-          className="text-slate-400 hover:text-white transition-colors"
+          className="w-full flex items-center justify-center rounded-xl bg-slate-800 p-3 text-slate-300 hover:text-white"
+          title={`${user.name ?? user.email} • ${user.role.replace('_', ' ')}`}
         >
-          <LogOut className="h-4 w-4" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white font-semibold">
+            {initial}
+          </span>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="p-4 border-t border-slate-700 flex items-center gap-3">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-600
-                     flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-        {initial}
+    <div className="border-t border-slate-800 p-4">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white font-semibold">
+          {initial}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-white">
+            {user.name ?? user.email}
+          </p>
+          <p className="truncate text-xs text-slate-400">
+            {user.role.replace('_', ' ')}
+          </p>
+        </div>
+        <button
+          onClick={onLogout}
+          className="text-slate-400 hover:text-white"
+          title="Logout"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-white truncate">{user.name ?? user.email}</p>
-        <p className="text-xs text-slate-400 truncate capitalize">{user.role.replace('_', ' ')}</p>
-      </div>
-      <button
-        onClick={onLogout}
-        title="Sign out"
-        className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
-      >
-        <LogOut className="h-4 w-4" />
-      </button>
     </div>
   );
 }
-
-// ─── Sidebar nav content (reusable in both desktop + mobile drawer) ───────────
 
 export function SidebarNavContent({
   collapsed = false,
@@ -225,8 +318,9 @@ export function SidebarNavContent({
   onNavClick?: () => void;
 }) {
   const pathname = usePathname();
-  const router   = useRouter();
-  const user     = useCurrentUserInfo();
+  const router = useRouter();
+  const user = useCurrentUserInfo();
+  const branding = useCompanyBranding();
 
   async function handleLogout() {
     const supabase = createClient();
@@ -235,102 +329,74 @@ export function SidebarNavContent({
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 text-white">
-      {/* Logo */}
-      <div className={`border-b border-slate-700 flex items-center
-        ${collapsed ? 'p-3 justify-center' : 'p-5 gap-3'}`}>
-        <div className="w-9 h-9 flex-shrink-0">
-          <Image src="/logo.svg" alt="SAB" width={36} height={36} />
-        </div>
-        {!collapsed && (
-          <div>
-            <h1 className="text-sm font-bold text-white leading-tight">Sabtech Online</h1>
-            <p className="text-xs text-slate-400">Invoicing System</p>
-          </div>
-        )}
-      </div>
+    <div className="flex h-full flex-col bg-[#071433]">
+      <SidebarBrand
+        collapsed={collapsed}
+        companyName={branding.company_name || 'Sabtech Online'}
+        logoUrl={branding.logo_url}
+      />
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 space-y-0.5" aria-label="Main navigation">
-        {/* Main items */}
+      <div className="flex-1 overflow-y-auto py-4">
         {mainNav.map(({ label, href, icon }) => {
           const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
+
           return (
             <NavItem
               key={href}
               href={href}
               label={label}
               icon={icon as ElementType}
-              isActive={isActive}
+              active={isActive}
               collapsed={collapsed}
-              accent="blue"
               onClick={onNavClick}
             />
           );
         })}
 
-        {/* Admin divider */}
         {!collapsed && (
-          <div className="pt-3 pb-1 px-5">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Admin</p>
+          <div className="px-5 pt-6 pb-2 text-xs font-semibold tracking-[0.2em] text-slate-500 uppercase">
+            Admin
           </div>
         )}
-        {collapsed && <div className="my-2 mx-3 border-t border-slate-700/60" />}
 
-        {/* Settings */}
         <SettingsSection collapsed={collapsed} pathname={pathname} />
 
-        {/* Users */}
         {adminNav.map(({ label, href, icon }) => {
           const isActive = pathname.startsWith(href);
+
           return (
             <NavItem
               key={href}
               href={href}
               label={label}
               icon={icon as ElementType}
-              isActive={isActive}
+              active={isActive}
               collapsed={collapsed}
-              accent="purple"
               onClick={onNavClick}
             />
           );
         })}
-      </nav>
+      </div>
 
-      {/* User footer */}
       <UserFooter collapsed={collapsed} user={user} onLogout={handleLogout} />
     </div>
   );
 }
-
-// ─── Desktop Sidebar ──────────────────────────────────────────────────────────
 
 export function Sidebar() {
   const { collapsed, toggle } = useSidebar();
 
   return (
     <aside
-      className={`hidden lg:flex flex-col fixed top-0 left-0 h-screen z-40
-                  bg-slate-900 border-r border-slate-700/50
-                  transition-all duration-200 ease-in-out
-                  ${collapsed ? 'w-16' : 'w-64'}`}
-      aria-label="Sidebar"
+      className={`hidden md:flex relative h-screen flex-col border-r border-slate-800 bg-[#071433] transition-all duration-300 ${
+        collapsed ? 'w-24' : 'w-80'
+      }`}
     >
-      {/* Collapse toggle button */}
       <button
         onClick={toggle}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        aria-expanded={!collapsed}
-        className="absolute -right-3 top-[72px] z-50 w-6 h-6 rounded-full
-                   bg-slate-700 border border-slate-600 text-slate-300
-                   hover:bg-slate-600 hover:text-white transition-colors
-                   flex items-center justify-center shadow-md"
+        className="absolute -right-4 top-40 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-700 text-white shadow-lg"
       >
-        {collapsed
-          ? <ChevronRight className="h-3 w-3" />
-          : <ChevronLeft  className="h-3 w-3" />
-        }
+        {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
       </button>
 
       <SidebarNavContent collapsed={collapsed} />
