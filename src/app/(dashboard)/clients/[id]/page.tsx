@@ -21,40 +21,40 @@ import {
 type Tab = 'overview' | 'details' | 'projects' | 'invoices' | 'payments' | 'statement';
 
 const TAB_LIST: { id: Tab; label: string }[] = [
-  { id: 'overview',  label: 'Overview'  },
-  { id: 'details',   label: 'Details'   },
-  { id: 'projects',  label: 'Projects'  },
-  { id: 'invoices',  label: 'Invoices'  },
-  { id: 'payments',  label: 'Payments'  },
+  { id: 'overview', label: 'Overview' },
+  { id: 'details', label: 'Details' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'invoices', label: 'Invoices' },
+  { id: 'payments', label: 'Payments' },
   { id: 'statement', label: 'Statement' },
 ];
 
 const statusColor: Record<string, string> = {
-  active:    'bg-green-100 text-green-700',
-  on_hold:   'bg-amber-100 text-amber-700',
+  active: 'bg-green-100 text-green-700',
+  on_hold: 'bg-amber-100 text-amber-700',
   completed: 'bg-blue-100 text-blue-700',
   cancelled: 'bg-slate-100 text-slate-500',
 };
 
 const paymentStatusColor = (s: string) => {
   if (s === 'reversed') return 'bg-red-100 text-red-600';
-  if (s === 'failed')   return 'bg-amber-100 text-amber-700';
-  if (s === 'pending')  return 'bg-slate-100 text-slate-500';
+  if (s === 'failed') return 'bg-amber-100 text-amber-700';
+  if (s === 'pending') return 'bg-slate-100 text-slate-500';
   return 'bg-green-100 text-green-700';
 };
 
 export default function ClientProfilePage() {
   const { id } = useParams<{ id: string }>();
-  const router  = useRouter();
+  const router = useRouter();
   const supabase = createClient();
 
-  const [client,   setClient]   = useState<Client | null>(null);
+  const [client, setClient] = useState<Client | null>(null);
   const [projects, setProjects] = useState<ProjectWithTotals[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<(Payment & { invoice: { invoice_number: string } })[]>([]);
-  const [tab,      setTab]      = useState<Tab>('overview');
-  const [loading,  setLoading]  = useState(true);
-  const [editing,  setEditing]  = useState(false);
+  const [tab, setTab] = useState<Tab>('overview');
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
   const load = useCallback(async () => {
@@ -89,25 +89,27 @@ export default function ClientProfilePage() {
   if (!client) return <div className="p-12 text-center text-red-500">Client not found</div>;
 
   // Financial totals — exclude void/cancelled
-  const activeInvoices  = invoices.filter(i => i.status !== 'void' && i.status !== 'cancelled');
-  const totalBilled     = activeInvoices.reduce((s, i) => s + i.total_amount, 0);
-  const totalPaid       = activeInvoices.reduce((s, i) => s + i.total_paid, 0);
+  const activeInvoices = invoices.filter(i => i.status !== 'void' && i.status !== 'cancelled');
+  const totalBilled = activeInvoices.reduce((s, i) => s + i.total_amount, 0);
+  const totalPaid = activeInvoices.reduce((s, i) => s + i.total_paid, 0);
   const totalOutstanding = activeInvoices.reduce((s, i) => s + i.balance_due, 0);
   const confirmedPayments = payments.filter(p => p.status !== 'reversed');
 
   async function handleArchiveToggle() {
+    if (!client) return;
+    const snap = client; // capture non-null for async body
     setArchiving(true);
-    await supabase.from('clients').update({ is_archived: !client.is_archived }).eq('id', client.id);
+    await supabase.from('clients').update({ is_archived: !snap.is_archived }).eq('id', snap.id);
     setClient(c => c ? { ...c, is_archived: !c.is_archived } : c);
     setArchiving(false);
   }
 
   const tabLabels: Record<Tab, string> = {
-    overview:  'Overview',
-    details:   'Details',
-    projects:  `Projects (${projects.length})`,
-    invoices:  `Invoices (${invoices.length})`,
-    payments:  `Payments (${confirmedPayments.length})`,
+    overview: 'Overview',
+    details: 'Details',
+    projects: `Projects (${projects.length})`,
+    invoices: `Invoices (${invoices.length})`,
+    payments: `Payments (${confirmedPayments.length})`,
     statement: 'Statement',
   };
 
@@ -128,9 +130,8 @@ export default function ClientProfilePage() {
               <span className="font-mono text-sm">{client.client_code}</span>
               {client.company_name && <span className="text-slate-400">·</span>}
               {client.company_name && <span>{client.company_name}</span>}
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                client.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
-              }`}>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${client.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                }`}>
                 {client.status ?? 'active'}
               </span>
               {client.is_archived && (
@@ -171,9 +172,9 @@ export default function ClientProfilePage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
         {[
-          { label: 'Total Billed',  value: formatCurrency(totalBilled, client.currency),      color: 'bg-blue-50  border-blue-200  text-blue-800',  icon: FileText  },
-          { label: 'Total Paid',    value: formatCurrency(totalPaid, client.currency),        color: 'bg-green-50 border-green-200 text-green-800', icon: CreditCard },
-          { label: 'Outstanding',   value: formatCurrency(totalOutstanding, client.currency), color: 'bg-amber-50 border-amber-200 text-amber-800', icon: AlertCircle },
+          { label: 'Total Billed', value: formatCurrency(totalBilled, client.currency), color: 'bg-blue-50  border-blue-200  text-blue-800', icon: FileText },
+          { label: 'Total Paid', value: formatCurrency(totalPaid, client.currency), color: 'bg-green-50 border-green-200 text-green-800', icon: CreditCard },
+          { label: 'Outstanding', value: formatCurrency(totalOutstanding, client.currency), color: 'bg-amber-50 border-amber-200 text-amber-800', icon: AlertCircle },
         ].map(({ label, value, color, icon: Icon }) => (
           <div key={label} className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${color}`}>
             <Icon className="h-5 w-5 opacity-60 flex-shrink-0" />
@@ -192,11 +193,10 @@ export default function ClientProfilePage() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-                tab === t.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.id
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
             >
               {tabLabels[t.id]}
             </button>
@@ -251,12 +251,12 @@ export default function ClientProfilePage() {
             <h3 className="text-sm font-semibold text-slate-700 mb-4">Business Details</h3>
             <dl className="space-y-2.5">
               {[
-                { label: 'Client Code',    value: client.client_code, mono: true },
-                { label: 'Company',        value: client.company_name },
+                { label: 'Client Code', value: client.client_code, mono: true },
+                { label: 'Company', value: client.company_name },
                 { label: 'Contact Person', value: client.contact_person },
-                { label: 'TIN Number',     value: client.tin_number, mono: true },
-                { label: 'Currency',       value: client.currency },
-                { label: 'Client Since',   value: formatDate(client.created_at) },
+                { label: 'TIN Number', value: client.tin_number, mono: true },
+                { label: 'Currency', value: client.currency },
+                { label: 'Client Since', value: formatDate(client.created_at) },
               ].map(({ label, value, mono }) => value ? (
                 <div key={label} className="flex items-start justify-between gap-4">
                   <dt className="text-xs text-slate-400 font-medium uppercase tracking-wide flex-shrink-0">{label}</dt>
@@ -295,22 +295,22 @@ export default function ClientProfilePage() {
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             {[
-              { label: 'Client Code',     value: client.client_code,      mono: true },
-              { label: 'Status',          value: client.status ?? 'active' },
-              { label: 'Client Name',     value: client.name },
-              { label: 'Company Name',    value: client.company_name },
-              { label: 'Contact Person',  value: client.contact_person },
-              { label: 'Email',           value: client.email },
-              { label: 'Phone',           value: client.phone },
+              { label: 'Client Code', value: client.client_code, mono: true },
+              { label: 'Status', value: client.status ?? 'active' },
+              { label: 'Client Name', value: client.name },
+              { label: 'Company Name', value: client.company_name },
+              { label: 'Contact Person', value: client.contact_person },
+              { label: 'Email', value: client.email },
+              { label: 'Phone', value: client.phone },
               { label: 'Alternate Phone', value: client.alternate_phone },
-              { label: 'City',            value: client.city },
-              { label: 'Country',         value: client.country },
-              { label: 'TIN Number',      value: client.tin_number, mono: true },
-              { label: 'Currency',        value: client.currency },
+              { label: 'City', value: client.city },
+              { label: 'Country', value: client.country },
+              { label: 'TIN Number', value: client.tin_number, mono: true },
+              { label: 'Currency', value: client.currency },
               { label: 'Billing Address', value: client.address, full: true },
-              { label: 'Notes',           value: client.notes,    full: true },
-              { label: 'Registered',      value: formatDate(client.created_at) },
-              { label: 'Last Updated',    value: formatDate(client.updated_at) },
+              { label: 'Notes', value: client.notes, full: true },
+              { label: 'Registered', value: formatDate(client.created_at) },
+              { label: 'Last Updated', value: formatDate(client.updated_at) },
             ].map(({ label, value, mono, full }) => (
               <div key={label} className={full ? 'sm:col-span-2' : ''}>
                 <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">{label}</p>
@@ -566,21 +566,30 @@ export default function ClientProfilePage() {
             Generate a full account statement showing all invoices, payments, and current balance for {client.name}.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              disabled
-              className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg opacity-40 cursor-not-allowed"
+            <a
+              href={`/api/pdf/statement/${client.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
             >
-              <FileDown className="h-4 w-4" /> Download PDF Statement
-            </button>
-            <p className="text-xs text-slate-400 self-center">PDF export coming in Phase 3F</p>
+              <FileDown className="h-4 w-4" /> View Statement
+            </a>
+            <a
+              href={`/api/pdf/statement/${client.id}?print=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
+            >
+              <FileDown className="h-4 w-4" /> Save as PDF
+            </a>
           </div>
 
           {/* Balance summary */}
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-lg mx-auto text-left">
             {[
-              { label: 'Total Invoiced',  value: formatCurrency(totalBilled, client.currency),       color: 'text-slate-900' },
-              { label: 'Total Received',  value: formatCurrency(totalPaid, client.currency),         color: 'text-green-700' },
-              { label: 'Balance Due',     value: formatCurrency(totalOutstanding, client.currency),  color: 'text-amber-700' },
+              { label: 'Total Invoiced', value: formatCurrency(totalBilled, client.currency), color: 'text-slate-900' },
+              { label: 'Total Received', value: formatCurrency(totalPaid, client.currency), color: 'text-green-700' },
+              { label: 'Balance Due', value: formatCurrency(totalOutstanding, client.currency), color: 'text-amber-700' },
             ].map(({ label, value, color }) => (
               <div key={label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                 <p className="text-xs text-slate-400 font-medium">{label}</p>

@@ -45,14 +45,29 @@ export default function InvoiceDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  async function nextPaymentNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `RCP-${year}-`;
+    const { data: latest } = await supabase
+      .from('payments')
+      .select('payment_number')
+      .like('payment_number', `${prefix}%`)
+      .order('payment_number', { ascending: false })
+      .limit(1);
+    let nextNum = 1;
+    if (latest && latest.length > 0) {
+      const parsed = parseInt(latest[0].payment_number.replace(prefix, ''), 10);
+      if (!isNaN(parsed)) nextNum = parsed + 1;
+    }
+    return `${prefix}${String(nextNum).padStart(4, '0')}`;
+  }
+
   async function recordPayment(e: React.FormEvent) {
     e.preventDefault();
     if (!payForm.amount_paid || parseFloat(payForm.amount_paid) <= 0) return;
     setSavingPay(true);
 
-    // Generate payment number
-    const { count } = await supabase.from('payments').select('*', { count: 'exact', head: true });
-    const payNum = `RCP-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`;
+    const payNum = await nextPaymentNumber();
 
     const { error } = await supabase.from('payments').insert({
       payment_number: payNum,

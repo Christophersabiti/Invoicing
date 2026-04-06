@@ -77,7 +77,7 @@ export function EditClientPanel({ client, onClose, onSaved }: Props) {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!form?.name.trim()) return;
+    if (!client || !form?.name.trim()) return;
     setSaving(true);
     setErrorMsg('');
     const payload = {

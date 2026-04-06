@@ -56,18 +56,35 @@ function NewInvoiceForm() {
 
   const [discountAmount, setDiscountAmount] = useState(0);
 
+  // Generate next invoice number by querying the highest existing one for this year
+  async function fetchNextInvoiceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `INV-${year}-`;
+    const { data: latest } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .like('invoice_number', `${prefix}%`)
+      .order('invoice_number', { ascending: false })
+      .limit(1);
+    let nextNum = 1;
+    if (latest && latest.length > 0) {
+      const parsed = parseInt(latest[0].invoice_number.replace(prefix, ''), 10);
+      if (!isNaN(parsed)) nextNum = parsed + 1;
+    }
+    return `${prefix}${String(nextNum).padStart(4, '0')}`;
+  }
+
   // Load data
   useEffect(() => {
     async function load() {
-      const [{ data: cl }, { data: svc }, { data: invCount }] = await Promise.all([
+      const [{ data: cl }, { data: svc }, nextNum] = await Promise.all([
         supabase.from('clients').select('*').eq('is_archived', false).order('name'),
         supabase.from('services').select('*').eq('is_active', true).order('category').order('service_name'),
-        supabase.from('invoices').select('id', { count: 'exact', head: true }),
+        fetchNextInvoiceNumber(),
       ]);
       setClients(cl || []);
       setServices(svc || []);
-      const num = ((invCount as unknown as { count: number })?.count || 0) + 1;
-      setInvoiceNumber(`INV-${new Date().getFullYear()}-${String(num).padStart(4, '0')}`);
+      setInvoiceNumber(nextNum);
     }
     load();
   }, []);
@@ -122,24 +139,41 @@ function NewInvoiceForm() {
     if (items.length === 0 || items.every(i => !i.item_name.trim())) { alert('Add at least one line item'); return; }
     setSaving(true);
 
-    const { data: inv, error: invErr } = await supabase.from('invoices').insert({
-      invoice_number: invoiceNumber,
-      client_id: header.client_id,
-      project_id: header.project_id || null,
-      schedule_id: header.schedule_id || null,
-      issue_date: header.issue_date,
-      due_date: header.due_date || null,
-      currency: header.currency,
-      subtotal,
-      discount_amount: discountAmount,
-      tax_amount: taxTotal,
-      total_amount: totalAmount,
-      total_paid: 0,
-      balance_due: totalAmount,
-      status,
-      notes: header.notes || null,
-      footer_note: header.footer_note || null,
-    }).select().single();
+    // Always re-fetch the latest number at save time to avoid stale duplicates.
+    // If a race condition still causes a duplicate key error, retry once with a
+    // freshly generated number before surfacing the error to the user.
+    const freshNumber = await fetchNextInvoiceNumber();
+    setInvoiceNumber(freshNumber);
+
+    async function attemptInsert(invNum: string) {
+      return supabase.from('invoices').insert({
+        invoice_number: invNum,
+        client_id: header.client_id,
+        project_id: header.project_id || null,
+        schedule_id: header.schedule_id || null,
+        issue_date: header.issue_date,
+        due_date: header.due_date || null,
+        currency: header.currency,
+        subtotal,
+        discount_amount: discountAmount,
+        tax_amount: taxTotal,
+        total_amount: totalAmount,
+        total_paid: 0,
+        balance_due: totalAmount,
+        status,
+        notes: header.notes || null,
+        footer_note: header.footer_note || null,
+      }).select().single();
+    }
+
+    let { data: inv, error: invErr } = await attemptInsert(freshNumber);
+
+    // Auto-retry once on duplicate key constraint
+    if (invErr?.code === '23505' && invErr.message.includes('invoice_number')) {
+      const retryNumber = await fetchNextInvoiceNumber();
+      setInvoiceNumber(retryNumber);
+      ({ data: inv, error: invErr } = await attemptInsert(retryNumber));
+    }
 
     if (invErr || !inv) {
       alert('Error creating invoice: ' + invErr?.message);
