@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Invitation } from '@/types';
-import { Clock, CheckCircle, XCircle, RefreshCw, AlertCircle, Mail, Loader2 } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, RefreshCw, AlertCircle, Mail, Loader2, Copy } from 'lucide-react';
 
 const STATUS_STYLES: Record<string, string> = {
   pending:  'bg-yellow-100 text-yellow-700',
@@ -24,6 +24,7 @@ export default function InvitationsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading]         = useState(true);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [copyingId, setCopyingId]     = useState<string | null>(null);
   const [toast, setToast]             = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const showToast = (type: 'success' | 'error', msg: string) => {
@@ -66,6 +67,26 @@ export default function InvitationsPage() {
       showToast('error', e instanceof Error ? e.message : 'Failed to resend');
     } finally {
       setResendingId(null);
+    }
+  }
+
+  async function handleCopyLink(inv: Invitation) {
+    setCopyingId(inv.id);
+    try {
+      const res = await fetch('/api/admin/generate-invite-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inv.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      await navigator.clipboard.writeText(data.action_link);
+      showToast('success', 'Direct invite link copied to clipboard!');
+    } catch (e: unknown) {
+      showToast('error', e instanceof Error ? e.message : 'Failed to generate link');
+    } finally {
+      setCopyingId(null);
     }
   }
 
@@ -131,6 +152,15 @@ export default function InvitationsPage() {
                     <td className="px-4 py-3">
                       {(inv.status === 'pending' || isExpired) && (
                         <div className="flex gap-2">
+                          <button
+                            onClick={() => handleCopyLink(inv)}
+                            disabled={copyingId === inv.id}
+                            className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 border border-emerald-200 hover:border-emerald-400 px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
+                            title="Copy Direct Invite Link"
+                          >
+                            {copyingId === inv.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Copy className="h-3 w-3" />}
+                            Copy Link
+                          </button>
                           <button
                             onClick={() => handleResend(inv)}
                             disabled={resendingId === inv.id}
