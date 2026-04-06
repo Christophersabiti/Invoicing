@@ -388,7 +388,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`hidden md:flex relative h-screen flex-col border-r border-slate-800 bg-[#071433] transition-all duration-300 ${
+      className={`hidden md:flex fixed top-0 left-0 h-screen flex-col border-r border-slate-800 bg-[#071433] transition-all duration-300 z-30 ${
         collapsed ? 'w-24' : 'w-80'
       }`}
     >
