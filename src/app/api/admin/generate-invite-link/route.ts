@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? req.nextUrl.origin}/auth/callback`;
   
   // Generate the Magic Link / Invite Link without sending the email via Supabase default
-  const { data: linkData, error: linkErr } = await adminSupabase.auth.admin.generateLink({
+  let { data: linkData, error: linkErr } = await adminSupabase.auth.admin.generateLink({
     type: 'invite',
     email: email.toLowerCase().trim(),
     options: {
@@ -59,8 +59,24 @@ export async function POST(req: NextRequest) {
     }
   });
 
+  // If the user already exists in auth.users (because an email invite was run or they signed up before),
+  // generating an invite link throws "already registered". We fallback to generating a regular magic link 
+  // which behaves the exact same way for getting them logged in to accept their backend invitation.
   if (linkErr) {
-    return NextResponse.json({ error: linkErr.message }, { status: 500 });
+    if (linkErr.message.toLowerCase().includes('already')) {
+      const { data: magicLinkData, error: magicLinkErr } = await adminSupabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: email.toLowerCase().trim(),
+        options: { redirectTo }
+      });
+      
+      if (magicLinkErr) {
+        return NextResponse.json({ error: magicLinkErr.message }, { status: 500 });
+      }
+      linkData = magicLinkData;
+    } else {
+      return NextResponse.json({ error: linkErr.message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ 
