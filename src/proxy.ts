@@ -2,7 +2,16 @@ import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
 
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/auth/accept-invite'];
-const ADMIN_PATHS  = ['/admin/users/roles', '/admin/users/invitations', '/admin/users'];
+const ADMIN_PATHS  = [
+  '/admin/users/roles',
+  '/admin/users/invitations',
+  '/admin/users',
+  '/admin/settings/company',
+  '/admin/settings/invoice',
+  '/admin/settings/branding',
+  '/admin/settings/payment-methods',
+  '/admin/settings',
+];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
