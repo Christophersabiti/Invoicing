@@ -68,6 +68,15 @@ export default function ClientProfilePage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // Guard: if the segment is literally "new", redirect to the create page.
+  // This handles Next.js 16 Turbopack routing where [id] can match before
+  // the static /clients/new segment in some edge cases.
+  useEffect(() => {
+    if (id === 'new') {
+      router.replace('/clients/new');
+    }
+  }, [id, router]);
+
   const [client, setClient] = useState<Client | null>(null);
   const [projects, setProjects] = useState<ProjectWithTotals[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -213,6 +222,11 @@ export default function ClientProfilePage() {
     } finally {
       setArchiving(false);
     }
+  }
+
+  // While redirecting "new" to the create page, show blank rather than error
+  if (id === 'new') {
+    return <div className="p-12 text-center text-slate-400">Redirecting…</div>;
   }
 
   if (loading) {
