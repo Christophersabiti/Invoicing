@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { CompanySettings } from '@/types';
 import { Building2, Save, Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { useRequireRole } from '@/hooks/useCurrentUser';
 
 const CURRENCIES = ['UGX', 'USD', 'EUR', 'GBP', 'KES', 'TZS', 'RWF'];
 const COUNTRIES = ['Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Ethiopia', 'South Africa', 'Nigeria', 'Ghana', 'Other'];
@@ -11,6 +12,7 @@ const COUNTRIES = ['Uganda', 'Kenya', 'Tanzania', 'Rwanda', 'Ethiopia', 'South A
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 export default function CompanySettingsPage() {
+  const { checking } = useRequireRole(['super_admin', 'admin']);
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -100,6 +102,7 @@ export default function CompanySettingsPage() {
     }
   }
 
+  if (checking) return <div className="py-16 text-center text-slate-400">Checking permissions…</div>;
   if (loading) return <div className="text-center py-12 text-slate-400">Loading settings…</div>;
 
   return (

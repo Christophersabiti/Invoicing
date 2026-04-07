@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, Fragment } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useRequireRole } from '@/hooks/useCurrentUser';
 import { AppUser, Permission, Role } from '@/types';
 import {
   ArrowLeft, Shield, CheckCircle, XCircle, Loader2,
@@ -26,6 +27,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function UserDetailPage() {
+  const { checking } = useRequireRole(['super_admin', 'admin']);
   const params  = useParams();
   const router  = useRouter();
   const supabase = createClient();
@@ -167,6 +169,8 @@ export default function UserDetailPage() {
   );
 
   const userRolePerms = rolePerms[user.role] ?? new Set<string>();
+
+  if (checking) return <div className="py-16 text-center text-slate-400">Checking permissions…</div>;
 
   return (
     <div>

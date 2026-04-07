@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useRequireRole } from '@/hooks/useCurrentUser';
 import { CompanySettings } from '@/types';
 import { Save, CheckCircle, AlertCircle, Receipt, ToggleLeft, ToggleRight } from 'lucide-react';
 
@@ -47,6 +48,7 @@ function Toggle({ on, onToggle, label, desc }: { on: boolean; onToggle: () => vo
 }
 
 export default function InvoiceSettingsPage() {
+  const { checking } = useRequireRole(['super_admin', 'admin']);
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -85,6 +87,7 @@ export default function InvoiceSettingsPage() {
     }
   }
 
+  if (checking) return <div className="py-16 text-center text-slate-400">Checking permissions…</div>;
   if (loading) return <div className="text-center py-12 text-slate-400">Loading…</div>;
 
   return (

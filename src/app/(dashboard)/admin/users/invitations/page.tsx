@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useRequireRole } from '@/hooks/useCurrentUser';
 import { Invitation } from '@/types';
 import { Clock, CheckCircle, XCircle, RefreshCw, AlertCircle, Mail, Loader2, Copy } from 'lucide-react';
 
@@ -20,6 +21,7 @@ const STATUS_ICONS: Record<string, React.ElementType> = {
 };
 
 export default function InvitationsPage() {
+  const { checking } = useRequireRole(['super_admin', 'admin']);
   const supabase = createClient();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -91,6 +93,8 @@ export default function InvitationsPage() {
   }
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  if (checking) return <div className="py-16 text-center text-slate-400">Checking permissions…</div>;
 
   return (
     <div>

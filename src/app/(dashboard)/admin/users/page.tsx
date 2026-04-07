@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useRequireRole } from '@/hooks/useCurrentUser';
 import { AppUser } from '@/types';
 import {
   UserCog, Plus, Search, X, Mail, CheckCircle,
@@ -44,6 +45,7 @@ function Avatar({ name, avatarUrl }: { name: string | null; avatarUrl: string | 
 }
 
 export default function UsersPage() {
+  const { checking } = useRequireRole(['super_admin', 'admin']);
   const supabase = createClient();
   const [users, setUsers]             = useState<AppUser[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -125,6 +127,8 @@ export default function UsersPage() {
     invited:  users.filter(u => u.status === 'invited').length,
     inactive: users.filter(u => u.status === 'inactive' || u.status === 'suspended').length,
   };
+
+  if (checking) return <div className="py-16 text-center text-slate-400">Checking permissions…</div>;
 
   return (
     <div>

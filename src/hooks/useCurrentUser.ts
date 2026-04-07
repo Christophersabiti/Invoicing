@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 export type CurrentUser = {
@@ -94,6 +95,34 @@ export function useCurrentUser() {
   }
 
   return { user, loading, can, isFinance, isAdmin };
+}
+
+/**
+ * Guard hook — redirects to `redirectTo` if user's role is not in `allowedRoles`.
+ * Use at the top of any page that should be restricted.
+ *
+ * Usage:
+ *   const { checking } = useRequireRole(['super_admin', 'admin']);
+ *   if (checking) return null;
+ */
+export function useRequireRole(
+  allowedRoles: string[],
+  redirectTo = '/',
+): { checking: boolean } {
+  const router = useRouter();
+  const { user, loading } = useCurrentUser();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user || !allowedRoles.includes(user.role)) {
+      router.replace(redirectTo);
+    } else {
+      setChecking(false);
+    }
+  }, [user, loading, allowedRoles, redirectTo, router]);
+
+  return { checking: loading || checking };
 }
 
 // ─── Permission Matrix ────────────────────────────────────────────────────────

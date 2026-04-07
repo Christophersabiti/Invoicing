@@ -353,29 +353,34 @@ export function SidebarNavContent({
           );
         })}
 
-        {!collapsed && (
-          <div className="px-5 pt-6 pb-2 text-xs font-semibold tracking-[0.2em] text-slate-500 uppercase">
-            Admin
-          </div>
+        {/* Admin section — only for super_admin and admin */}
+        {(user?.role === 'super_admin' || user?.role === 'admin') && (
+          <>
+            {!collapsed && (
+              <div className="px-5 pt-6 pb-2 text-xs font-semibold tracking-[0.2em] text-slate-500 uppercase">
+                Admin
+              </div>
+            )}
+
+            <SettingsSection collapsed={collapsed} pathname={pathname} />
+
+            {adminNav.map(({ label, href, icon }) => {
+              const isActive = pathname.startsWith(href);
+
+              return (
+                <NavItem
+                  key={href}
+                  href={href}
+                  label={label}
+                  icon={icon as ElementType}
+                  isActive={isActive}
+                  collapsed={collapsed}
+                  onClick={onNavClick}
+                />
+              );
+            })}
+          </>
         )}
-
-        <SettingsSection collapsed={collapsed} pathname={pathname} />
-
-        {adminNav.map(({ label, href, icon }) => {
-          const isActive = pathname.startsWith(href);
-
-          return (
-            <NavItem
-              key={href}
-              href={href}
-              label={label}
-              icon={icon as ElementType}
-              isActive={isActive}
-              collapsed={collapsed}
-              onClick={onNavClick}
-            />
-          );
-        })}
       </div>
 
       <UserFooter collapsed={collapsed} user={user} onLogout={handleLogout} />

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useRequireRole } from '@/hooks/useCurrentUser';
 import { PaymentMethodDB, PaymentMethodType } from '@/types';
 import {
   Plus, Pencil, Trash2, Eye, EyeOff, GripVertical,
@@ -60,6 +61,7 @@ const EMPTY_FORM: Omit<PaymentMethodDB, 'id' | 'created_at' | 'updated_at'> = {
 };
 
 export default function PaymentMethodsPage() {
+  const { checking } = useRequireRole(['super_admin', 'admin']);
   const supabase = createClient();
   const [methods, setMethods] = useState<PaymentMethodDB[]>([]);
   const [loading, setLoading] = useState(true);
@@ -165,6 +167,8 @@ export default function PaymentMethodsPage() {
   const showMerchant = f.method_type === 'momo_merchant';
   const showBank    = ['bank_transfer', 'wire_transfer'].includes(f.method_type);
   const showSwift   = f.method_type === 'wire_transfer';
+
+  if (checking) return <div className="py-16 text-center text-slate-400">Checking permissions…</div>;
 
   return (
     <div className="max-w-4xl">
