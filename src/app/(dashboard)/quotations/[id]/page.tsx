@@ -8,7 +8,7 @@ import { Quotation, QuotationItem, QuotationStatus, Project } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   ArrowLeft, Edit2, Send, CheckCircle, XCircle,
-  RefreshCw, Zap, Loader2, AlertCircle,
+  RefreshCw, Zap, Loader2, AlertCircle, FileText, Printer,
 } from 'lucide-react';
 
 const STATUS_STYLES: Record<QuotationStatus, string> = {
@@ -190,6 +190,24 @@ export default function QuotationDetailPage() {
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2">
+            {/* PDF buttons — always visible */}
+            <a
+              href={`/api/pdf/quotation/${quotation.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+            >
+              <FileText className="h-4 w-4" /> View PDF
+            </a>
+            <a
+              href={`/api/pdf/quotation/${quotation.id}?print=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+            >
+              <Printer className="h-4 w-4" /> Print / Download
+            </a>
+
             {canEdit && (
               <Link
                 href={`/quotations/${quotation.id}/edit`}
