@@ -300,3 +300,57 @@ export type Invitation = {
   accepted_at: string | null;
   created_at: string;
 };
+
+// ─── Quotation Module ─────────────────────────────────────────────────────────
+
+export type QuotationStatus =
+  | 'draft'
+  | 'sent'
+  | 'approved'
+  | 'rejected'
+  | 'expired'
+  | 'converted';
+
+export type Quotation = {
+  id: string;
+  quotation_number: string;
+  client_id: string | null;
+  project_name: string;
+  issue_date: string;
+  valid_until: string;
+  currency: string;
+  notes: string | null;
+  status: QuotationStatus;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  client?: { name: string; company_name: string | null } | null;
+  quotation_items?: QuotationItem[];
+};
+
+export type QuotationItem = {
+  id: string;
+  quotation_id: string;
+  item_name: string;
+  description: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  sort_order: number;
+  created_at: string;
+};
+
+export type ProjectTask = {
+  id: string;
+  project_id: string | null;
+  quotation_id: string | null;
+  quotation_item_id: string | null;
+  title: string;
+  description: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  created_at: string;
+};

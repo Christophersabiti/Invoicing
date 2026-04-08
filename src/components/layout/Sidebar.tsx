@@ -21,6 +21,7 @@ import {
   ChevronRight,
   ChevronDown,
   LogOut,
+  ClipboardList,
 } from 'lucide-react';
 import { useState, useEffect, ElementType } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -28,13 +29,14 @@ import { useSidebar } from './SidebarContext';
 import { NavItem } from './NavItem';
 
 const mainNav = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Clients', href: '/clients', icon: Users },
-  { label: 'Projects', href: '/projects', icon: FolderOpen },
-  { label: 'Services', href: '/services', icon: Tag },
-  { label: 'Invoices', href: '/invoices', icon: FileText },
-  { label: 'Payments', href: '/payments', icon: CreditCard },
-  { label: 'Reports', href: '/reports', icon: BarChart2 },
+  { label: 'Dashboard',   href: '/',            icon: LayoutDashboard },
+  { label: 'Clients',     href: '/clients',      icon: Users },
+  { label: 'Projects',    href: '/projects',     icon: FolderOpen },
+  { label: 'Quotations',  href: '/quotations',   icon: ClipboardList },
+  { label: 'Services',    href: '/services',     icon: Tag },
+  { label: 'Invoices',    href: '/invoices',     icon: FileText },
+  { label: 'Payments',    href: '/payments',     icon: CreditCard },
+  { label: 'Reports',     href: '/reports',      icon: BarChart2 },
 ];
 
 const settingsNav = [
