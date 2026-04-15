@@ -8,7 +8,7 @@ import { Project, Invoice, InvoiceSchedule, Client } from '@/types';
 import { formatCurrency, formatDate, BILLING_TYPE_LABELS } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ArrowLeft, Plus, X, Pencil, Trash2, Tag } from 'lucide-react';
+import { ArrowLeft, Plus, X, Pencil, Trash2, Tag, Settings2, CheckCircle, XCircle } from 'lucide-react';
 
 type Tab = 'overview' | 'tasks' | 'invoices' | 'schedule';
 
@@ -64,6 +64,15 @@ export default function ProjectProfilePage() {
   const [tab, setTab]               = useState<Tab>('overview');
   const [loading, setLoading]       = useState(true);
 
+  // Edit project modal
+  const [showEditProject, setShowEditProject] = useState(false);
+  const [editProjectForm, setEditProjectForm] = useState({
+    project_name: '', project_manager: '', status: '',
+    start_date: '', end_date: '', total_contract_amount: '', description: '',
+  });
+  const [savingProject, setSavingProject]   = useState(false);
+  const [projectToast, setProjectToast]     = useState<{ msg: string; ok: boolean } | null>(null);
+
   // Schedule form
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [scheduleForm, setScheduleForm]         = useState({ schedule_name: '', description: '', percentage: '', fixed_amount: '', due_date: '' });
@@ -94,6 +103,45 @@ export default function ProjectProfilePage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // ── Project edit ───────────────────────────────────────────────────────────
+  function openEditProject() {
+    if (!project) return;
+    setEditProjectForm({
+      project_name:           project.project_name,
+      project_manager:        project.project_manager || '',
+      status:                 project.status,
+      start_date:             project.start_date || '',
+      end_date:               project.end_date || '',
+      total_contract_amount:  project.total_contract_amount != null ? String(project.total_contract_amount) : '',
+      description:            project.description || '',
+    });
+    setShowEditProject(true);
+  }
+
+  async function saveProject(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingProject(true);
+    const payload = {
+      project_name:          editProjectForm.project_name.trim(),
+      project_manager:       editProjectForm.project_manager.trim() || null,
+      status:                editProjectForm.status,
+      start_date:            editProjectForm.start_date || null,
+      end_date:              editProjectForm.end_date || null,
+      total_contract_amount: editProjectForm.total_contract_amount ? parseFloat(editProjectForm.total_contract_amount) : null,
+      description:           editProjectForm.description.trim() || null,
+    };
+    const { error } = await supabase.from('projects').update(payload).eq('id', id);
+    if (error) {
+      setProjectToast({ msg: error.message, ok: false });
+    } else {
+      setProject(p => p ? { ...p, ...payload } : p);
+      setShowEditProject(false);
+      setProjectToast({ msg: 'Project updated successfully.', ok: true });
+    }
+    setSavingProject(false);
+    setTimeout(() => setProjectToast(null), 3000);
+  }
 
   // ── Schedule CRUD ──────────────────────────────────────────────────────────
   async function addScheduleLine(e: React.FormEvent) {
@@ -220,6 +268,16 @@ export default function ProjectProfilePage() {
 
   return (
     <div>
+      {/* Toast */}
+      {projectToast && (
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${
+          projectToast.ok ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          {projectToast.ok ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+          {projectToast.msg}
+        </div>
+      )}
+
       <div className="mb-6">
         <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-4">
           <ArrowLeft className="h-4 w-4" /> Back to Projects
@@ -228,12 +286,20 @@ export default function ProjectProfilePage() {
           title={project.project_name}
           subtitle={`${project.project_code} · ${project.client?.name}`}
           action={
-            <Link
-              href={`/invoices/new?project=${project.id}&client=${project.client_id}`}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
-            >
-              + New Invoice
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openEditProject}
+                className="inline-flex items-center gap-2 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                <Settings2 className="h-4 w-4" /> Edit Project
+              </button>
+              <Link
+                href={`/invoices/new?project=${project.id}&client=${project.client_id}`}
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+              >
+                + New Invoice
+              </Link>
+            </div>
           }
         />
       </div>
@@ -707,6 +773,132 @@ export default function ProjectProfilePage() {
                 <button type="button" onClick={() => setShowScheduleForm(false)} className="flex-1 border border-slate-200 text-slate-700 py-2 rounded-lg text-sm">Cancel</button>
                 <button type="submit" disabled={savingSchedule} className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">
                   {savingSchedule ? 'Saving...' : 'Add Line'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT PROJECT MODAL ── */}
+      {showEditProject && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 sticky top-0 bg-white z-10">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Edit Project</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{project.project_code}</p>
+              </div>
+              <button onClick={() => setShowEditProject(false)}><X className="h-5 w-5 text-slate-400" /></button>
+            </div>
+
+            <form onSubmit={saveProject} className="p-6 space-y-4">
+              {/* Project Name */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Project Name *</label>
+                <input
+                  required
+                  type="text"
+                  value={editProjectForm.project_name}
+                  onChange={e => setEditProjectForm(f => ({ ...f, project_name: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Status *</label>
+                <select
+                  value={editProjectForm.status}
+                  onChange={e => setEditProjectForm(f => ({ ...f, status: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="on_hold">On Hold</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+                {/* Status preview pill */}
+                <div className="mt-2">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusColor[editProjectForm.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                    {editProjectForm.status.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Project Manager */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Project Manager</label>
+                <input
+                  type="text"
+                  value={editProjectForm.project_manager}
+                  onChange={e => setEditProjectForm(f => ({ ...f, project_manager: e.target.value }))}
+                  placeholder="Full name"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Contract Amount */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Contract Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editProjectForm.total_contract_amount}
+                  onChange={e => setEditProjectForm(f => ({ ...f, total_contract_amount: e.target.value }))}
+                  placeholder="0"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={editProjectForm.start_date}
+                    onChange={e => setEditProjectForm(f => ({ ...f, start_date: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={editProjectForm.end_date}
+                    onChange={e => setEditProjectForm(f => ({ ...f, end_date: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={editProjectForm.description}
+                  onChange={e => setEditProjectForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditProject(false)}
+                  className="flex-1 border border-slate-200 text-slate-700 py-2.5 rounded-lg text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingProject}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+                >
+                  {savingProject ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
             </form>
