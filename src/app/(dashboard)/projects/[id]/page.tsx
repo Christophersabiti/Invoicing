@@ -66,8 +66,16 @@ export default function ProjectProfilePage() {
 
   // Edit project modal
   const [showEditProject, setShowEditProject] = useState(false);
-  const [editProjectForm, setEditProjectForm] = useState({
-    project_name: '', project_manager: '', status: '',
+  const [editProjectForm, setEditProjectForm] = useState<{
+    project_name: string;
+    project_manager: string;
+    status: Project['status'];
+    start_date: string;
+    end_date: string;
+    total_contract_amount: string;
+    description: string;
+  }>({
+    project_name: '', project_manager: '', status: 'active',
     start_date: '', end_date: '', total_contract_amount: '', description: '',
   });
   const [savingProject, setSavingProject]   = useState(false);
@@ -122,10 +130,10 @@ export default function ProjectProfilePage() {
   async function saveProject(e: React.FormEvent) {
     e.preventDefault();
     setSavingProject(true);
-    const payload = {
+    const payload: Partial<Project> = {
       project_name:          editProjectForm.project_name.trim(),
       project_manager:       editProjectForm.project_manager.trim() || null,
-      status:                editProjectForm.status,
+      status:                editProjectForm.status as Project['status'],
       start_date:            editProjectForm.start_date || null,
       end_date:              editProjectForm.end_date || null,
       total_contract_amount: editProjectForm.total_contract_amount ? parseFloat(editProjectForm.total_contract_amount) : null,
@@ -810,7 +818,7 @@ export default function ProjectProfilePage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Status *</label>
                 <select
                   value={editProjectForm.status}
-                  onChange={e => setEditProjectForm(f => ({ ...f, status: e.target.value }))}
+                  onChange={e => setEditProjectForm(f => ({ ...f, status: e.target.value as Project['status'] }))}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="active">Active</option>
