@@ -46,6 +46,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'email and role are required' }, { status: 400 });
   }
 
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+  }
+
+  // Validate role is one of the defined system roles — prevents arbitrary role injection
+  const VALID_ROLES = ['super_admin', 'admin', 'finance', 'project_manager', 'staff', 'client'];
+  if (!VALID_ROLES.includes(role)) {
+    return NextResponse.json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}` }, { status: 400 });
+  }
+
+  // Only super_admin can assign super_admin or admin roles
+  if (['super_admin', 'admin'].includes(role) && appUser.role !== 'super_admin') {
+    return NextResponse.json({ error: 'Only super admins can assign admin-level roles' }, { status: 403 });
+  }
+
   // Service role client for admin operations
   const adminSupabase = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

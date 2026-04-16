@@ -2,6 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 // ─── Hardcoded fallbacks (used if DB tables not yet created) ─────────────────
 const COMPANY_DEFAULTS = {
@@ -111,10 +113,30 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" 
   <text x="118" y="132" font-family="Arial Black,Helvetica Neue,sans-serif" font-size="90" font-weight="900" fill="url(#g1)">B</text>
 </svg>`;
 
+async function requireAuth(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const authClient = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll()     { return cookieStore.getAll(); },
+        setAll(list) { list.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); },
+      },
+    }
+  );
+  const { data: { session } } = await authClient.auth.getSession();
+  return !!session;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await requireAuth())) {
+    return new NextResponse('Unauthorized — please log in to view this document', { status: 401 });
+  }
+
   const { id } = await params;
   const isPrint = req.nextUrl.searchParams.get('print') === '1';
   const supabase = getSupabase();

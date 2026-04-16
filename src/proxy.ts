@@ -16,10 +16,9 @@ const ADMIN_PATHS  = [
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Allow public assets and API routes to pass through
+  // Allow public assets to pass through (no auth needed)
   if (
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/pdf') ||        // invoice PDFs are public links
     pathname === '/favicon.ico' ||
     pathname === '/logo.svg'
   ) {

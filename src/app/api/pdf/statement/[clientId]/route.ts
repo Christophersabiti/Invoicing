@@ -2,6 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 // ─── Company fallbacks ────────────────────────────────────────────────────────
 const COMPANY_DEFAULTS = {
@@ -86,10 +88,30 @@ type DBPayment = {
   invoice: { invoice_number: string } | null;
 };
 
+async function requireAuth(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const authClient = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll()     { return cookieStore.getAll(); },
+        setAll(list) { list.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); },
+      },
+    }
+  );
+  const { data: { session } } = await authClient.auth.getSession();
+  return !!session;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ clientId: string }> },
 ) {
+  if (!(await requireAuth())) {
+    return new NextResponse('Unauthorized — please log in to view this document', { status: 401 });
+  }
+
   const { clientId } = await params;
   const isPrint = req.nextUrl.searchParams.get('print') === '1';
   const supabase = getSupabase();

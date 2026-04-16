@@ -2,8 +2,10 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
-// ─── Company fallbacks ────────────────────────────────────────────────────────
+// ─── Company fallbacks (no sensitive data) ───────────────────────────────────
 const COMPANY_DEFAULTS = {
   name:          'Sabtech Online',
   email:         'info@sabtechonline.com',
@@ -17,13 +19,6 @@ const COMPANY_DEFAULTS = {
   show_tin:      true,
   show_logo:     true,
 };
-
-// ─── Payment details ──────────────────────────────────────────────────────────
-const PAYMENT_INFO = [
-  { label: 'Airtel Money', detail: '0750 876 997 — Christopher Sabiti' },
-  { label: 'MTN MoMo',     detail: '0777 293 933 — Christopher Sabiti' },
-  { label: 'Centenary Bank', detail: 'A/C 3200051550, Kasese Branch — Christopher Sabiti' },
-];
 
 // ─── Inline logo SVG ──────────────────────────────────────────────────────────
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" style="height:56px;width:56px;flex-shrink:0">
@@ -46,6 +41,22 @@ function getSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
+}
+
+async function requireAuth(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const authClient = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll()     { return cookieStore.getAll(); },
+        setAll(list) { list.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); },
+      },
+    }
+  );
+  const { data: { session } } = await authClient.auth.getSession();
+  return !!session;
 }
 
 function fmt(amount: number, currency = 'UGX'): string {
@@ -103,15 +114,52 @@ type DBQuotation = {
   }>;
 };
 
+type DBPaymentMethod = {
+  display_name: string;
+  method_type: string;
+  account_name: string | null;
+  account_number: string | null;
+  phone_number: string | null;
+  merchant_code: string | null;
+  bank_name: string | null;
+  branch: string | null;
+  swift_code: string | null;
+  instructions: string | null;
+  show_on_invoice: boolean;
+  is_active: boolean;
+  display_order: number;
+};
+
+function buildPaymentMethodHtml(m: DBPaymentMethod): string {
+  const lines: string[] = [];
+  if (m.account_name)   lines.push(`<span>${m.account_name}</span>`);
+  if (m.phone_number)   lines.push(`<span style="font-family:monospace">${m.phone_number}</span>`);
+  if (m.merchant_code)  lines.push(`<span>Code: <span style="font-family:monospace">${m.merchant_code}</span></span>`);
+  if (m.account_number) lines.push(`<span>A/C: <span style="font-family:monospace">${m.account_number}</span></span>`);
+  if (m.bank_name)      lines.push(`<span>${m.bank_name}${m.branch ? ` · ${m.branch}` : ''}</span>`);
+  if (m.swift_code)     lines.push(`<span>SWIFT: ${m.swift_code}</span>`);
+  if (m.instructions)   lines.push(`<span style="font-style:italic">${m.instructions}</span>`);
+  return `
+    <div style="display:flex;align-items:flex-start;gap:14px;padding:9px 0;border-bottom:1px solid #f1f5f9">
+      <div style="min-width:150px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;padding-top:1px">${m.display_name}</div>
+      <div style="font-size:12px;color:#0f172a;display:flex;flex-direction:column;gap:2px">${lines.join('')}</div>
+    </div>`;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  if (!(await requireAuth())) {
+    return new NextResponse('Unauthorized — please log in to view this document', { status: 401 });
+  }
+
   const { id } = await params;
   const isPrint = req.nextUrl.searchParams.get('print') === '1';
   const supabase = getSupabase();
 
-  const [{ data: qRow }, { data: companyRow }] = await Promise.all([
+  const [{ data: qRow }, { data: companyRow }, { data: paymentMethods }] = await Promise.all([
     supabase
       .from('quotations')
       .select('*, client:clients(name, company_name, email, phone, address, city, country, tin_number), quotation_items(*)')
@@ -119,14 +167,21 @@ export async function GET(
       .order('sort_order', { referencedTable: 'quotation_items', ascending: true })
       .single(),
     supabase.from('company_settings').select('*').eq('id', 1).single(),
+    supabase
+      .from('payment_methods')
+      .select('*')
+      .eq('is_active', true)
+      .eq('show_on_invoice', true)
+      .order('display_order', { ascending: true }),
   ]);
 
   if (!qRow) {
     return new NextResponse('Quotation not found', { status: 404 });
   }
 
-  const q   = qRow as DBQuotation;
+  const q     = qRow as DBQuotation;
   const items = (q.quotation_items || []).sort((a, b) => a.sort_order - b.sort_order);
+  const pms   = (paymentMethods || []) as DBPaymentMethod[];
 
   const co = {
     name:          companyRow?.company_name  ?? COMPANY_DEFAULTS.name,
@@ -158,12 +213,10 @@ export async function GET(
         <td style="padding:10px 14px;border-bottom:1px solid #f1f5f9;text-align:right;font-size:13px;font-weight:700;color:#0f172a">${fmt(item.line_total, currency)}</td>
       </tr>`).join('');
 
-  // ── Payment methods HTML ──────────────────────────────────────────────────
-  const paymentHtml = PAYMENT_INFO.map(p => `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9">
-      <div style="min-width:130px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em">${p.label}</div>
-      <div style="font-size:12px;color:#0f172a;font-family:monospace">${p.detail}</div>
-    </div>`).join('');
+  // ── Payment methods from DB ───────────────────────────────────────────────
+  const paymentHtml = pms.length === 0
+    ? `<p style="font-size:12px;color:#94a3b8;padding:8px 0">Contact us for payment details.</p>`
+    : pms.map(buildPaymentMethodHtml).join('');
 
   // ── Full HTML document ────────────────────────────────────────────────────
   const html = `<!DOCTYPE html>
@@ -218,8 +271,6 @@ export async function GET(
 
   <!-- ── Document Header ── -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px;padding-bottom:24px;border-bottom:3px solid ${co.primary_color}">
-
-    <!-- Company branding -->
     <div style="display:flex;align-items:center;gap:14px">
       ${co.show_logo && co.logo_url
         ? `<img src="${co.logo_url}" alt="Logo" style="width:56px;height:56px;object-fit:contain;flex-shrink:0"/>`
@@ -231,8 +282,6 @@ export async function GET(
         ${co.show_tin && co.tin ? `<div style="font-size:11px;color:#64748b;margin-top:3px">TIN: <strong style="font-family:monospace;color:${co.primary_color}">${co.tin}</strong></div>` : ''}
       </div>
     </div>
-
-    <!-- Quotation title block -->
     <div style="text-align:right">
       <div style="font-size:28px;font-weight:900;color:${co.primary_color};letter-spacing:-.8px">QUOTATION</div>
       <div style="margin-top:6px;display:inline-block;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 14px">
@@ -248,8 +297,6 @@ export async function GET(
 
   <!-- ── Client + Quotation Meta ── -->
   <div style="display:flex;gap:28px;margin-bottom:36px">
-
-    <!-- Client block -->
     <div style="flex:1.2">
       <div class="section-title">Prepared For</div>
       ${client ? `
@@ -262,8 +309,6 @@ export async function GET(
         ${client.tin_number ? `<div style="font-size:11px;color:#64748b;margin-top:4px">TIN: <strong style="font-family:monospace">${client.tin_number}</strong></div>` : ''}
       ` : '<div style="font-size:13px;color:#94a3b8">—</div>'}
     </div>
-
-    <!-- Quotation meta -->
     <div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px">
       <div class="section-title">Quotation Details</div>
       ${q.project_name ? `
@@ -299,9 +344,7 @@ export async function GET(
           <th class="r" style="width:120px">Total</th>
         </tr>
       </thead>
-      <tbody>
-        ${itemsHtml}
-      </tbody>
+      <tbody>${itemsHtml}</tbody>
     </table>
   </div>
 
@@ -336,7 +379,8 @@ export async function GET(
     <p style="font-size:12px;color:#78716c;line-height:1.7;white-space:pre-line">${q.notes}</p>
   </div>` : ''}
 
-  <!-- ── Payment Information ── -->
+  <!-- ── Payment Information (from DB) ── -->
+  ${pms.length > 0 ? `
   <div style="margin-bottom:32px">
     <div class="section-title">Payment Information</div>
     <p style="font-size:12px;color:#64748b;margin-bottom:12px">
@@ -348,7 +392,7 @@ export async function GET(
     <p style="font-size:11px;color:#94a3b8;margin-top:8px">
       Please include the quotation number <strong style="font-family:monospace;color:#475569">${q.quotation_number}</strong> as your payment reference.
     </p>
-  </div>
+  </div>` : ''}
 
   <!-- ── Footer ── -->
   <div style="border-top:1px solid #e2e8f0;padding-top:20px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px">
