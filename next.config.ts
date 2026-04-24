@@ -17,6 +17,10 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // next-pwa v10 injects a webpack config internally; this empty turbopack key tells
+  // Next.js 16 to proceed with Turbopack regardless (the workbox SW is still generated).
+  turbopack: {},
+
   images: {
     remotePatterns: [
       {
