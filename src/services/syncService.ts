@@ -22,8 +22,6 @@ interface SyncResult {
   error?: string;
 }
 
-type AnyRecord = Record<string, unknown>;
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function getLastSyncedAt(table: string): Promise<string | null> {
@@ -37,8 +35,10 @@ async function setLastSyncedAt(table: string, ts: string) {
 
 // ─── Per-table sync ───────────────────────────────────────────────────────────
 
-async function syncTable<T extends AnyRecord>(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// T is unconstrained so every Dexie table (even ones without a string index
+// signature) is accepted. We cast to Record<string,unknown> only when we need
+// to read the dynamic orderColumn value.
+async function syncTable<T>(
   supabase: ReturnType<typeof createClient>,
   tableName: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,9 +65,10 @@ async function syncTable<T extends AnyRecord>(
     const rows: T[] = data ?? [];
     if (rows.length > 0) {
       await dexieTable.bulkPut(rows);
-      // Advance the cursor to the most recent timestamp in this batch
+      // Advance the cursor to the most recent timestamp in this batch.
+      // Cast to Record so we can read the dynamic orderColumn key safely.
       const latest = rows.reduce<string>((max, row) => {
-        const ts = row[orderColumn] as string | undefined;
+        const ts = (row as Record<string, unknown>)[orderColumn] as string | undefined;
         return ts && ts > max ? ts : max;
       }, since ?? '1970-01-01T00:00:00Z');
       await setLastSyncedAt(tableName, latest);
